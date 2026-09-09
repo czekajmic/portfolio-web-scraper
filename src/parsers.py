@@ -13,7 +13,7 @@ def extract_project_links(html_content: str, base_url: str = "https://mapadotacj
     return links
 
 if __name__ == "__main__":
-    #test IO na czas budowy parsera
+    #test IO na czas budowy parsera, pozwala na szybką weryfikację logiki z pliku lokalnego
     import os
     test_file = "check1.html"
     if not os.path.exists(test_file):
