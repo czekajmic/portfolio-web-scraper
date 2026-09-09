@@ -1,9 +1,8 @@
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from typing import Set
 
-def extract_project_links(html_content: str, base_url: str = "https://mapadotacji.gov.pl") -> Set[str]:
-    links: Set[str] = set()
+def extract_project_links(html_content: str, base_url: str = "https://mapadotacji.gov.pl") -> set[str]:
+    links: set[str] = set()
     soup = BeautifulSoup(html_content, "html.parser")
 
     for a_tag in soup.select("td.see-all a[href*='/projekty/']"):
