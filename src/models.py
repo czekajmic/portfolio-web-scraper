@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 class ProjectDetails(BaseModel):
     id_projektu: str = Field(..., description="ID projektu, np. 752129")
@@ -23,3 +23,10 @@ class ProjectDetails(BaseModel):
     powiaty: list[str] = Field(default_factory=list, description="Powiaty projektu")
 
     opis: str | None = None
+
+    #pole obliczeniowe z linkiem do projektu
+    @computed_field(description="Automatycznie generowany link do projektu")
+    def url_projektu(self) -> str:
+        if self.id_projektu == "BRAK_ID":   #TODO magic string, do poprawy, pewnie osobny constant będzie lepszy
+            return "BRAK_LINKU"
+        return f"https://mapdotacji.gov.pl/projekty/{self.id_projektu}/"
