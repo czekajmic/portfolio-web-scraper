@@ -20,6 +20,6 @@ class ProjectDetails(BaseModel):
     wojewodztwa: list[str] = Field(default_factory=list, description="Województwa projektu lub ogólnopolskie")
 
     #powiat na 100% bywa pusty, tutaj więc nie będzie blokady walidacji
-    powiat: list[str] = Field(default_factory=list, description="Powiaty projektu")
+    powiaty: list[str] = Field(default_factory=list, description="Powiaty projektu")
 
     opis: str | None = None
