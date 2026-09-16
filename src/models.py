@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, computed_field
+from config import BASE_URL, UNKNOWN_ID_FLAG
 
 class ProjectDetails(BaseModel):
     id_projektu: str = Field(..., description="ID projektu, np. 752129")
@@ -27,6 +28,6 @@ class ProjectDetails(BaseModel):
     #pole obliczeniowe z linkiem do projektu
     @computed_field(description="Automatycznie generowany link do projektu")
     def url_projektu(self) -> str:
-        if self.id_projektu == "BRAK_ID":   #TODO magic string, do poprawy, pewnie osobny constant będzie lepszy
+        if self.id_projektu == UNKNOWN_ID_FLAG:
             return "BRAK_LINKU"
-        return f"https://mapadotacji.gov.pl/projekty/{self.id_projektu}/"
+        return f"{BASE_URL}/projekty/{self.id_projektu}/"

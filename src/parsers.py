@@ -2,8 +2,9 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from models import ProjectDetails
 import re
+from config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_TITLE_FLAG
 
-def extract_project_links(html_content: str, base_url: str = "https://mapadotacji.gov.pl") -> set[str]:
+def extract_project_links(html_content: str, base_url: str = BASE_URL) -> set[str]:
     links: set[str] = set()
     soup = BeautifulSoup(html_content, "html.parser")
 
@@ -19,7 +20,7 @@ def parse_project_details(html_content: str) -> ProjectDetails:
     soup = BeautifulSoup(html_content, "html.parser")
     
     #najpierw ID, szukamy klasy w body zaczynającej się od "postid-"
-    id_projektu = "BRAK_ID"
+    id_projektu = UNKNOWN_ID_FLAG
     body_tag = soup.find("body")
     if body_tag and body_tag.get("class"):
         for klasa in body_tag.get("class") or []:
@@ -29,7 +30,7 @@ def parse_project_details(html_content: str) -> ProjectDetails:
 
     # teraz tytuł projektu
     title_element = soup.find("h2", class_="big-title")
-    tytul = title_element.text.strip() if title_element else "Brak tytułu"
+    tytul = title_element.text.strip() if title_element else UNKNOWN_TITLE_FLAG
 
     # kategorie
     kategorie = []
