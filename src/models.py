@@ -29,4 +29,4 @@ class ProjectDetails(BaseModel):
     def url_projektu(self) -> str:
         if self.id_projektu == "BRAK_ID":   #TODO magic string, do poprawy, pewnie osobny constant będzie lepszy
             return "BRAK_LINKU"
-        return f"https://mapdotacji.gov.pl/projekty/{self.id_projektu}/"
+        return f"https://mapadotacji.gov.pl/projekty/{self.id_projektu}/"
