@@ -7,7 +7,7 @@ import time
 logger = logging.getLogger(__name__)
 
 class MapadotacjiScraper:
-    def __init__(self, storage_manager):
+    def __init__(self, storage_manager: Any):
         #klasa sama nie otwiera pliku, tylko dostaje gotowy obiekt storage
         self.storage = storage_manager
 
@@ -16,6 +16,9 @@ class MapadotacjiScraper:
         self.client = httpx.Client(headers=DEFAULT_HEADERS, timeout=timeout, http2=True)
 
         logger.info("Zainicjalizowano MapadotacjiScraper")
+
+    def __enter__(self):
+        return self
 
     def fetch_html(self, url: str) -> str:
         #pobiera kod HTML z danego url
@@ -35,6 +38,9 @@ class MapadotacjiScraper:
             #czas oczekiwania
             time.sleep(DEFAULT_DELAY_DURATION)
         raise RuntimeError("Nieoczekiwany błąd pętli fetch_html")
+    def __exit__(self, exc_type, exc, tb):
+        self.client.close()
+        logger.info("Zamknięto klienta HTTP")
 
 
 #TESTOWANIE
@@ -43,8 +49,7 @@ if __name__ == "__main__":
     from src.parsers import parse_project_details
     from src.storage import JsonlStorage
 
-    storage = JsonlStorage("test_dane.jsonl")
-    scraper = MapadotacjiScraper(storage_manager=storage)
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
     logger.info("Testowanie scrapera")
     test_urls = [
@@ -52,8 +57,9 @@ if __name__ == "__main__":
     ]
 
     try:
-        for url in test_urls:
-            pobrany_html = scraper.fetch_html(url)
-            print(pobrany_html[:1000]) #już nie będziemy wszystkiego tu wypisywać
+        with JsonlStorage("test_dane.jsonl") as storage, MapadotacjiScraper(storage_manager=storage) as scraper:
+            for url in test_urls:
+                pobrany_html = scraper.fetch_html(url)
+                print(pobrany_html[:1000]) #już nie będziemy wszystkiego tu wypisywać
     except Exception as e:
         print(f"Wystąpił błąd {e}")
