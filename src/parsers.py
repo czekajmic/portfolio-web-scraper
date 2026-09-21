@@ -1,8 +1,8 @@
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from models import ProjectDetails
+from src.models import ProjectDetails
 import re
-from config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_TITLE_FLAG
+from src.config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_TITLE_FLAG
 
 def extract_project_links(html_content: str, base_url: str = BASE_URL) -> set[str]:
     links: set[str] = set()

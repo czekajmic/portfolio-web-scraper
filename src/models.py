@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, computed_field
-from config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_LINK_FLAG
+from src.config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_LINK_FLAG
 
 class ProjectDetails(BaseModel):
     id_projektu: str = Field(..., description="ID projektu, np. 752129")
