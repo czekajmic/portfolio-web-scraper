@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, computed_field
-from config import BASE_URL, UNKNOWN_ID_FLAG
+from config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_LINK_FLAG
 
 class ProjectDetails(BaseModel):
     id_projektu: str = Field(..., description="ID projektu, np. 752129")
@@ -29,5 +29,5 @@ class ProjectDetails(BaseModel):
     @computed_field(description="Automatycznie generowany link do projektu")
     def url_projektu(self) -> str:
         if self.id_projektu == UNKNOWN_ID_FLAG:
-            return "BRAK_LINKU"
+            return UNKNOWN_LINK_FLAG
         return f"{BASE_URL}/projekty/{self.id_projektu}/"
