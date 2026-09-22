@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, computed_field, model_validator
-from src.config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_LINK_FLAG, UNKNOWN_TITLE_FLAG
+from src.config import BASE_URL, UNKNOWN_ID_FLAG, UNKNOWN_LINK_FLAG, UNKNOWN_TITLE_FLAG, INVALID_PROJECT_ERROR_MESSAGE
 
 class ProjectDetails(BaseModel):
     id_projektu: str = Field(..., description="ID projektu, np. 752129")
@@ -37,6 +37,6 @@ class ProjectDetails(BaseModel):
         #jeśli scraper pobierze stronę z błędnym linkiem, np. ID 0, która zwróciła status 200 ale nie zawiera żadnych danych, zablokujemy stworzenie modelu
         if self.id_projektu == UNKNOWN_ID_FLAG and self.tytul == UNKNOWN_TITLE_FLAG:
             raise ValueError(
-                "Odrzucono model: Wykryto brak ID oraz tytułu jednocześnie."
+                INVALID_PROJECT_ERROR_MESSAGE
             )
         return self
