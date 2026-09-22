@@ -3,6 +3,8 @@ from typing import Any
 from src.config import DEFAULT_HEADERS, DEFAULT_TIMEOUT_DURATION, DEFAULT_CONNECT_DURATION, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_DURATION
 import httpx
 import time
+from src.parsers import parse_project_details
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,18 @@ class MapadotacjiScraper:
         self.client.close()
         logger.info("Zamknięto klienta HTTP")
 
+    def process_project(self, project_url: str)  -> bool:
+        logger.debug(f"Przetwarzanie projektu {project_url}")
+        try:
+            html_content = self.fetch_html(project_url)
+            project_model = parse_project_details(html_content)
+            self.storage.save_project(project_model)
+            logger.info(f"Zapisano {project_model.tytul}")
+            return True
+        except Exception as e:
+            logger.error(f"Błąd przy przetwarzaniu {project_url}: {e}")
+            return False
+
 
 #TESTOWANIE
 if __name__ == "__main__":
@@ -49,17 +63,35 @@ if __name__ == "__main__":
     from src.parsers import parse_project_details
     from src.storage import JsonlStorage
 
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    log_format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format=log_format,
+        handlers=[
+            logging.FileHandler("scraper_debug.log", encoding="utf-8", mode="a"),
+            logging.StreamHandler(sys.stdout)
+        ]
+        )
+    #mamy level logów jako debug, ale wyciszamy zewnętrzne biblioteki
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("hpack").setLevel(logging.WARNING)
 
     logger.info("Testowanie scrapera")
     test_urls = [
-        "https://mapadotacji.gov.pl/projekty/746927/"
+        "https://mapadotacji.gov.pl/projekty/746927/",
+        "https://mapadotacji.gov.pl/projekty/0/",
+        "https://mapadotacji.gov.pl/projekty/1691544/",
+        "https://simulatehttpcode.vercel.app/statuscode?q=429"
     ]
 
     try:
         with JsonlStorage("test_dane.jsonl") as storage, MapadotacjiScraper(storage_manager=storage) as scraper:
             for url in test_urls:
-                pobrany_html = scraper.fetch_html(url)
-                print(pobrany_html[:1000]) #już nie będziemy wszystkiego tu wypisywać
+                #pobrany_html = scraper.fetch_html(url)
+                #print(pobrany_html[:1000]) #już nie będziemy wszystkiego tu wypisywać
+                czy_sukces = scraper.process_project(url)
+                if czy_sukces:
+                    logger.info(f"Projekt {url} pomyślnie dopisany do pliku JSONL")
     except Exception as e:
         print(f"Wystąpił błąd {e}")
