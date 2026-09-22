@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from types import TracebackType
 from typing import Type
+import os
 
 from src.models import ProjectDetails
 
@@ -35,9 +36,37 @@ class JsonlStorage:
         json_string = project.model_dump_json()
         self._file_handle.write(json_string + "\n")
 
+#zarządza listą odwiedzonych linków i pilnuje duplikatów dzięki set()
+class ProgressTracker:
+    def __init__(self, file_path: str = "visited_urls.txt"):
+        self.file_path = file_path
+        self.visited = set()
+        self._load_existing()
+
+    def _load_existing(self):
+        if os.path.exists(self.file_path):
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    url = line.strip()
+                    if url:
+                        self.visited.add(url)
+            logger.info(f"Wczytano {len(self.visited)} już przetworzonych linków")
+        else:
+            logger.info(f"Nie znaleziono pliku {self.file_path}, zbieranie linków od nowa")
+
+    def is_visited(self, url: str) -> bool:
+        return url in self.visited
+
+    def mark_visited(self, url: str):
+        if url not in self.visited: #ten warunek musi być mimo używania set(), inaczej będziemy dopisywać do pliku za każdym razem!
+            self.visited.add(url)
+            with open(self.file_path, "a", encoding="utf-8") as f:
+                f.write(f"{url}\n")
+
 #blok testowy
 if __name__ == "__main__":
     import json
+    from pathlib import Path
     logging.basicConfig(level=logging.DEBUG)
     test_file = Path("data_test/test_output.jsonl")
     try:
@@ -71,3 +100,29 @@ if __name__ == "__main__":
             data = json.loads(line)
             print(f"Linia {i}: {data}")
     print(f"Zapisano i odczytano {len(lines)} w {test_file}")
+
+    #test ProgressTracker
+    test_file_tracker = Path("data_test/test_visited.txt")
+
+    #usuwanie w ramach testu, uwaga!!
+    if test_file_tracker.exists():
+        test_file_tracker.unlink()
+
+    tracker = ProgressTracker(file_path=str(test_file_tracker))
+
+    test_urls = ["https://wp.pl", "https://wykop.pl", "https://wp.pl"]
+
+    for url in test_urls:
+        if tracker.is_visited(url):
+            print(f"Pomijam {url} bo duplikat")
+        else:
+            print(f"Nowy url {url}, zapisywany do pliku")
+            tracker.mark_visited(url)
+
+    #próbujemy wznowić
+    tracker_resume = ProgressTracker(file_path=str(test_file_tracker))
+
+    if tracker_resume.is_visited("https://wp.pl"):
+        print("https://wp.pl zostało zapamiętane z sukcesem")
+    else:
+        print("fail")
