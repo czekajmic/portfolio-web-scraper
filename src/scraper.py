@@ -5,6 +5,7 @@ import httpx
 import time
 from src.parsers import parse_project_details
 import sys
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -17,26 +18,58 @@ class MapadotacjiScraper:
 
         self.client = httpx.Client(headers=DEFAULT_HEADERS, timeout=timeout, http2=True)
 
+        self._cooldown_lock = threading.Lock()
+        self._cooldown_until: float = 0.0
+
         logger.info("Zainicjalizowano MapadotacjiScraper")
 
     def __enter__(self):
         return self
 
+    def _wait_if_cooldown(self):
+        with self._cooldown_lock:
+            now = time.time()
+            if self._cooldown_until > now:
+                sleep_time = self._cooldown_until - now
+                logger.warning(f"Zatrzymanie wątku, trwa globalny cooldown, komenda sleep na {sleep_time:.2f} sek")
+            else:
+                sleep_time = 0.0
+        if sleep_time > 0:
+            logger.warning(f"Zatrzymanie wątku przez globalny cooldown, komenda sleep na {sleep_time:.2f} sek")
+            time.sleep(sleep_time)
+
     def fetch_html(self, url: str) -> str:
         #pobiera kod HTML z danego url
         for attempt in range(1, DEFAULT_MAX_RETRIES + 1):
+            #najpierw sprawdzamy czy nie ma cooldownu
+            self._wait_if_cooldown()
+
             try:
                 logger.debug(f"Pobieranie {attempt}/{DEFAULT_MAX_RETRIES} dla {url}")
                 response = self.client.get(url)
                 #wyjątek jeśli zły status http
                 response.raise_for_status()
                 return response.text
-            except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.NetworkError) as e:
+            except (httpx.HTTPStatusError) as e:
+                status = e.response.status_code
                 logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
 
-                if attempt == DEFAULT_MAX_RETRIES:
-                    logger.error(f"Wyczerpano limit prób dla {url}")
-                    raise
+                
+                if status in (429, 403, 503): #typ rate limit
+                    cooldown_time = 12*(5**attempt) #minuta, 5 i 15
+
+                    logger.error(f"Otrzymano ban ({status}) dla {url}, uruchamiamy cooldown na {cooldown_time} sek")
+
+                    with self._cooldown_lock:
+                        now = time.time()
+                        new_cooldown = now + cooldown_time
+                        if new_cooldown > self._cooldown_until:
+                            self._cooldown_until = new_cooldown
+            except (httpx.TimeoutException, httpx.NetworkError) as e:
+                logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
+            if attempt == DEFAULT_MAX_RETRIES:
+                logger.error(f"Wyczerpano limit prób dla {url}")
+                raise RuntimeError(f"Nie udało się pobrać {url}")
             #czas oczekiwania
             time.sleep(DEFAULT_DELAY_DURATION)
         raise RuntimeError("Nieoczekiwany błąd pętli fetch_html")
