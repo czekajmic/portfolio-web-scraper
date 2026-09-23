@@ -38,9 +38,11 @@ class JsonlStorage:
 
 #zarządza listą odwiedzonych linków i pilnuje duplikatów dzięki set()
 class ProgressTracker:
-    def __init__(self, file_path: str = "visited_urls.txt"):
+    def __init__(self, file_path: str = "visited_urls.txt", file_path_for_searches: str = "visited_searches.txt"):
         self.file_path = file_path
+        self.file_path_for_searches = file_path_for_searches
         self.visited = set()
+        self.visited_searches = set()
         self._load_existing()
 
     def _load_existing(self):
@@ -53,6 +55,13 @@ class ProgressTracker:
             logger.info(f"Wczytano {len(self.visited)} już przetworzonych linków")
         else:
             logger.info(f"Nie znaleziono pliku {self.file_path}, zbieranie linków od nowa")
+        if os.path.exists(self.file_path_for_searches):
+            with open(self.file_path_for_searches, "r", encoding="utf-8") as f:
+                for line in f:
+                    page = line.strip()
+                    if page.isdigit():
+                        self.visited_searches.add(int(page))
+            logger.info(f"Wczytano {len(self.visited_searches)} gotowych stron wyszukiwania z {self.file_path_for_searches}")
 
     def is_visited(self, url: str) -> bool:
         return url in self.visited
@@ -62,6 +71,15 @@ class ProgressTracker:
             self.visited.add(url)
             with open(self.file_path, "a", encoding="utf-8") as f:
                 f.write(f"{url}\n")
+
+    def is_search_page_visited(self, page_num: int) -> bool:
+        return page_num in self.visited_searches
+
+    def mark_search_page_visited(self, page_num: int):
+        if page_num not in self.visited_searches:
+            self.visited_searches.add(page_num)
+            with open(self.file_path_for_searches, "a", encoding="utf-8") as f:
+                f.write(f"{page_num}\n")
 
 #blok testowy
 if __name__ == "__main__":
@@ -103,12 +121,15 @@ if __name__ == "__main__":
 
     #test ProgressTracker
     test_file_tracker = Path("data_test/test_visited.txt")
+    test_searches_tracker = Path("data_test/test_visited_searches.txt")
 
     #usuwanie w ramach testu, uwaga!!
     if test_file_tracker.exists():
         test_file_tracker.unlink()
+    if test_searches_tracker.exists():
+        test_searches_tracker.unlink()
 
-    tracker = ProgressTracker(file_path=str(test_file_tracker))
+    tracker = ProgressTracker(file_path=str(test_file_tracker), file_path_for_searches=str(test_searches_tracker))
 
     test_urls = ["https://wp.pl", "https://wykop.pl", "https://wp.pl"]
 
