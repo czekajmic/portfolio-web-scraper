@@ -6,17 +6,21 @@ from src.parsers import extract_project_links
 from src.config import BASE_URL
 import time
 import concurrent.futures
+import itertools
 
 MAX_WORKERS = 5
 
 
-def run_crawler(max_pages: int = 2):
+def run_crawler():
     logger = logging.getLogger(__name__)
     logger.info("Crawler rozpoczął pracę")
 
     tracker = ProgressTracker(file_path="visited_urls.txt")
 
     with JsonlStorage("mapadotacji_wyniki.jsonl") as storage, MapadotacjiScraper(storage_manager=storage) as scraper:
+
+        kolejne_bledy_z_rzedu = 0
+        LIMIT_BLEDOW = 3
 
         #wyodrębniona funkcja-worker do wywoływania na wielu wątkach
         def _process_single_url(url: str, i: int, total_urls: int) -> None:
@@ -31,7 +35,7 @@ def run_crawler(max_pages: int = 2):
                 tracker.mark_visited(url)
 
 
-        for page_num in range(1, max_pages+1):
+        for page_num in itertools.count(start=1):
             if tracker.is_search_page_visited(page_num):
                 logger.debug(f"Pomijam stronę {page_num}, ta strona została już zebrana")
                 continue
@@ -68,8 +72,13 @@ def run_crawler(max_pages: int = 2):
                     logger.info(f"Strona {page_num} pomyślnie oznaczona jako przetworzona")
                 else:
                     logger.warning(f"Strona {page_num} zakończyła się z błędami w workerach. Nie zapisano jej jako ukończonej.")
+                kolejne_bledy_z_rzedu = 0
             except Exception as e:
                 logger.error(f"Błąd podczas crawlingu strony {page_url}: {e}")
+                kolejne_bledy_z_rzedu += 1
+                if kolejne_bledy_z_rzedu >= LIMIT_BLEDOW:
+                    logger.error(f"Przerwano pętlę - wystąpił limit błędów z rzędu dla strony wyszukiwania {page_num}")
+                    break
                 continue
             time.sleep(1.0)
     logger.info("Zakończono pracę crawlera")
@@ -93,4 +102,4 @@ if __name__ == "__main__":
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("hpack").setLevel(logging.WARNING)
 
-    run_crawler(max_pages=7)
+    run_crawler()
