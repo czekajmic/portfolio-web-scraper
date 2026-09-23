@@ -3,6 +3,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Type
 import os
+import threading
 
 from src.models import ProjectDetails
 
@@ -17,6 +18,7 @@ class JsonlStorage:
         self.mode = mode
         self.encoding = encoding
         self._file_handle = None
+        self._lock = threading.Lock()
 
     def __enter__(self) -> "JsonlStorage":
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -34,7 +36,10 @@ class JsonlStorage:
         if not self._file_handle:
             raise RuntimeError("Błąd file_handle!")
         json_string = project.model_dump_json()
-        self._file_handle.write(json_string + "\n")
+
+        #blokada dla innych wątków
+        with self._lock:
+            self._file_handle.write(json_string + "\n")
 
 #zarządza listą odwiedzonych linków i pilnuje duplikatów dzięki set()
 class ProgressTracker:
@@ -43,6 +48,7 @@ class ProgressTracker:
         self.file_path_for_searches = file_path_for_searches
         self.visited = set()
         self.visited_searches = set()
+        self._lock = threading.Lock()
         self._load_existing()
 
     def _load_existing(self):
@@ -67,19 +73,21 @@ class ProgressTracker:
         return url in self.visited
 
     def mark_visited(self, url: str):
-        if url not in self.visited: #ten warunek musi być mimo używania set(), inaczej będziemy dopisywać do pliku za każdym razem!
-            self.visited.add(url)
-            with open(self.file_path, "a", encoding="utf-8") as f:
-                f.write(f"{url}\n")
+        with self._lock:
+            if url not in self.visited: #ten warunek musi być mimo używania set(), inaczej będziemy dopisywać do pliku za każdym razem!
+                self.visited.add(url)
+                with open(self.file_path, "a", encoding="utf-8") as f:
+                    f.write(f"{url}\n")
 
     def is_search_page_visited(self, page_num: int) -> bool:
         return page_num in self.visited_searches
 
     def mark_search_page_visited(self, page_num: int):
-        if page_num not in self.visited_searches:
-            self.visited_searches.add(page_num)
-            with open(self.file_path_for_searches, "a", encoding="utf-8") as f:
-                f.write(f"{page_num}\n")
+        with self._lock:
+            if page_num not in self.visited_searches:
+                self.visited_searches.add(page_num)
+                with open(self.file_path_for_searches, "a", encoding="utf-8") as f:
+                    f.write(f"{page_num}\n")
 
 #blok testowy
 if __name__ == "__main__":
