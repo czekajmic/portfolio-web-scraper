@@ -114,3 +114,30 @@ def test_run_crawler_saves_page_on_success(
 
     #flaga strony musiała zostać zapisana w trackerze
     mock_tracker_instance.mark_search_page_visited.assert_called_once_with(1)
+
+#test 4: zabezpieczenie pętli głównej przed nieskończonością
+@patch("src.main.MapadotacjiScraper", autospec=True)
+@patch("src.main.JsonlStorage", autospec=True)
+@patch("src.main.ProgressTracker", autospec=True)
+def test_run_crawler_breaks_after_consecutive_errors(
+    MockTracker: MagicMock,
+    MockStorage: MagicMock,
+    MockScraper: MagicMock
+):
+    #testujemy bezpiecznik LIMIT_BLEDOW dla pętli itertools.count, upewniamy się że seria nieprzewidzianych wyjątków podczas pobierania stron paginacji spoworuje awaryjne przerwanie crawlera, a nie nieskończone działanie
+    mock_tracker_instance = MockTracker.return_value
+    mock_scraper_instance = MockScraper.return_value.__enter__.return_value
+
+    mock_tracker_instance.is_search_page_visited.return_value = False
+
+    #symulujemy ciągłą awarię serwera
+    mock_scraper_instance.fetch_html.side_effect = Exception("Sztuczny permanentny błąd serwera")
+
+    with patch("src.main.extract_project_links", return_value=["https://test-link.gov.pl"]):
+        with patch("src.main.BASE_URL", "https://test.gov.pl"):
+            #crawler używa time.sleep w swojej pętli obsługi błędu, nie ma co tego robić w teście więc to patchujemy
+            with patch("time.sleep"):
+                run_crawler()
+
+    #weryfikujemy, że program zamknął system po 3 błędach
+    assert mock_scraper_instance.fetch_html.call_count == 3
