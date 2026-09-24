@@ -22,17 +22,20 @@ def run_crawler():
         kolejne_bledy_z_rzedu = 0
         LIMIT_BLEDOW = 3
 
-        #wyodrębniona funkcja-worker do wywoływania na wielu wątkach
-        def _process_single_url(url: str, i: int, total_urls: int) -> None:
+        #wyodrębniona funkcja-worker do wywoływania na wielu wątkach, musi zwracać bool jako ostateczny sukces swojej pracy
+        def _process_single_url(url: str, i: int, total_urls: int) -> bool:
             if tracker.is_visited(url):
                 logger.debug(f"Pominięto {url}, już odwiedzony")
-                return
+                return True 
             
             logger.debug(f"Pobieranie projektu {i}/{total_urls} ze strony {url}")
             
             czy_sukces = scraper.process_project(url)
             if czy_sukces:
                 tracker.mark_visited(url)
+
+            #scraper może rzucić wyjątek i oddać false
+            return czy_sukces
 
 
         for page_num in itertools.count(start=1):
@@ -63,7 +66,15 @@ def run_crawler():
                     for future in concurrent.futures.as_completed(future_to_url):
                         current_url = future_to_url[future]
                         try:
-                            future.result() #blokuje wątek póki się nie skończy, a jeśli błąd to będzie wyrzucony tutaj
+                            #musimy pobrać wynik true/false od workera
+                            #blokuje wątek póki się nie skończy, a jeśli błąd to będzie wyrzucony tutaj
+                            sukces_workera = future.result()
+
+                            #jeśli false, strona ma niezapisany projekt
+                            if not sukces_workera:
+                                logger.error(f"Worker nad {current_url} zakończył się z błędem")
+                                page_pelen_sukces = False
+
                         except Exception as e:
                             logger.error(f"Worker pracujący nad {current_url} napotkał błąd: {e}", exc_info=True)
                             page_pelen_sukces = False
