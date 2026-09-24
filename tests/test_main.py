@@ -78,3 +78,39 @@ def test_run_crawler_does_not_save_page_on_scraper_silent_failure(
 
     #zapis powinien się zablokować ze względu na wynik false ze scrapera
     mock_tracker_instance.mark_search_page_visited.assert_not_called()
+
+#Test 3: gdy wszystko jest w porządku
+@patch("src.main.MapadotacjiScraper", autospec=True)
+@patch("src.main.JsonlStorage", autospec=True)
+@patch("src.main.ProgressTracker", autospec=True)
+def test_run_crawler_saves_page_on_success(
+    MockTracker: MagicMock,
+    MockStorage: MagicMock,
+    MockScraper: MagicMock
+):
+    mock_tracker_instance = MockTracker.return_value
+    mock_scraper_instance = MockScraper.return_value.__enter__.return_value
+
+    mock_tracker_instance.is_search_page_visited.return_value = False
+    mock_tracker_instance.is_visited.return_value = False
+
+    def mock_fetch_tml(url):
+        if "page_no=1" in url:
+            return "ZAWARTOSC_STRONY_1"
+        return "PUSTA_STRONA"
+
+    def mock_extract(html_content, base_url):
+        if "ZAWARTOSC_STRONY_1" in html_content:
+            return ["https://test-link.gov.pl"]
+        return []
+
+    with patch("src.main.extract_project_links", side_effect=mock_extract):
+        with patch("src.main.BASE_URL", "https://test.gov.pl"):
+            #wymuszamy pełen sukces workera
+            mock_scraper_instance.process_project.return_value = True
+            mock_scraper_instance.fetch_html.side_effect = mock_fetch_tml
+
+            run_crawler()
+
+    #flaga strony musiała zostać zapisana w trackerze
+    mock_tracker_instance.mark_search_page_visited.assert_called_once_with(1)
