@@ -66,7 +66,10 @@ class MapadotacjiScraper:
                         if new_cooldown > self._cooldown_until:
                             self._cooldown_until = new_cooldown
             except (httpx.TimeoutException, httpx.NetworkError) as e:
-                logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
+                cooldown_time = (2 ** attempt) + DEFAULT_DELAY_DURATION
+                logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}, czekam {cooldown_time} sek")
+                time.sleep(cooldown_time)
+                continue
             if attempt == DEFAULT_MAX_RETRIES:
                 logger.error(f"Wyczerpano limit prób dla {url}")
                 raise RuntimeError(f"Nie udało się pobrać {url}")
