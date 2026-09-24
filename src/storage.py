@@ -40,6 +40,7 @@ class JsonlStorage:
         #blokada dla innych wątków
         with self._lock:
             self._file_handle.write(json_string + "\n")
+            self._file_handle.flush()
 
 #zarządza listą odwiedzonych linków i pilnuje duplikatów dzięki set()
 class ProgressTracker:
