@@ -50,7 +50,7 @@ class MapadotacjiScraper:
                 #wyjątek jeśli zły status http
                 response.raise_for_status()
                 return response.text
-            except (httpx.HTTPStatusError) as e:
+            except httpx.HTTPStatusError as e:
                 status = e.response.status_code
                 logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
 
@@ -65,17 +65,16 @@ class MapadotacjiScraper:
                         new_cooldown = now + cooldown_time
                         if new_cooldown > self._cooldown_until:
                             self._cooldown_until = new_cooldown
-            except (httpx.TimeoutException, httpx.NetworkError) as e:
+            except httpx.RequestError as e:
                 cooldown_time = (2 ** attempt) + DEFAULT_DELAY_DURATION
                 logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}, czekam {cooldown_time} sek")
                 time.sleep(cooldown_time)
                 continue
-            if attempt == DEFAULT_MAX_RETRIES:
-                logger.error(f"Wyczerpano limit prób dla {url}")
-                raise RuntimeError(f"Nie udało się pobrać {url}")
             #czas oczekiwania
             time.sleep(DEFAULT_DELAY_DURATION)
-        raise RuntimeError("Nieoczekiwany błąd pętli fetch_html")
+        #jeśli tu dotarliśmy, to wyczerpaliśmy limit prób
+        logger.error(f"Wyczerpano limit prób dla {url}")
+        raise RuntimeError("Nie udało się pobrać {url}")
     def __exit__(self, exc_type, exc, tb):
         self.client.close()
         logger.info("Zamknięto klienta HTTP")
