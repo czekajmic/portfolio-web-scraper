@@ -53,7 +53,7 @@ class MapadotacjiScraper:
                 return response.text
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code
-                logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
+                logger.warning(f"Błąd sieci {status} podczas pobierania nr {attempt} dla {url}: {e}")
 
                 if 400 <= status < 500 and status not in (429, 403):
                     logger.error(f"Błąd klienta {status} dla {url}")
@@ -61,9 +61,10 @@ class MapadotacjiScraper:
 
                 
                 if status in (429, 403, 503): #typ rate limit
-                    cooldown_time = 12*(5**attempt) #minuta, 5 i 15
+                    cooldowns = {1: 60, 2: 300, 3:900}
+                    cooldown_time = cooldowns.get(attempt, 900)
 
-                    logger.error(f"Otrzymano ban ({status}) dla {url}, uruchamiamy cooldown na {cooldown_time} sek")
+                    logger.error(f"Otrzymano ban ({status}) dla {url}, uruchamiamy cooldown na {cooldown_time}")
 
                     with self._cooldown_lock:
                         now = time.time()
@@ -71,12 +72,16 @@ class MapadotacjiScraper:
                         if new_cooldown > self._cooldown_until:
                             self._cooldown_until = new_cooldown
             except httpx.RequestError as e:
-                cooldown_time = (2 ** attempt) + DEFAULT_DELAY_DURATION
-                logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}, czekam {cooldown_time} sek")
-                time.sleep(cooldown_time)
+                cooldown_time = 15*(2 ** attempt-1)
+                logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
+
+                with self._cooldown_lock:
+                    now = time.time()
+                    new_cooldown = now + cooldown_time
+                    if new_cooldown > self._cooldown_until:
+                        logger.warning(f"Wykryto timeout, globalne uśpienie na {cooldown_time}")
+                        self._cooldown_until = new_cooldown
                 continue
-            #czas oczekiwania
-            time.sleep(DEFAULT_DELAY_DURATION)
         #jeśli tu dotarliśmy, to wyczerpaliśmy limit prób
         logger.error(f"Wyczerpano limit prób dla {url}")
         raise RuntimeError("Nie udało się pobrać {url}")
