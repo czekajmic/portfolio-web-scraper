@@ -1,3 +1,8 @@
+DEBUG_MODE = True
+DEBUG_MAX_PAGES = 10
+LIMIT_BLEDOW = 3
+LINKS_FILE = "project_links.txt"
+
 BASE_URL = "https://mapadotacji.gov.pl"
 UNKNOWN_ID_FLAG = "BRAK_ID"
 UNKNOWN_TITLE_FLAG = "BRAK_TYTULU"
