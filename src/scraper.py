@@ -1,5 +1,6 @@
 import logging
-from typing import Any
+from typing import Optional
+from src.storage import JsonlStorage
 from src.config import DEFAULT_HEADERS, DEFAULT_TIMEOUT_DURATION, DEFAULT_CONNECT_DURATION, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_DURATION
 import httpx
 import time
@@ -10,7 +11,7 @@ import threading
 logger = logging.getLogger(__name__)
 
 class MapadotacjiScraper:
-    def __init__(self, storage_manager: Any):
+    def __init__(self, storage_manager: Optional[JsonlStorage]):
         #klasa sama nie otwiera pliku, tylko dostaje gotowy obiekt storage
         self.storage = storage_manager
 
@@ -54,6 +55,10 @@ class MapadotacjiScraper:
                 status = e.response.status_code
                 logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
 
+                if 400 <= status < 500 and status not in (429, 403):
+                    logger.error(f"Błąd klienta {status} dla {url}")
+                    raise RuntimeError(f"Błąd {status} dla {url}")
+
                 
                 if status in (429, 403, 503): #typ rate limit
                     cooldown_time = 12*(5**attempt) #minuta, 5 i 15
@@ -84,8 +89,12 @@ class MapadotacjiScraper:
         try:
             html_content = self.fetch_html(project_url)
             project_model = parse_project_details(html_content)
-            self.storage.save_project(project_model)
-            logger.info(f"Zapisano {project_model.tytul}")
+
+            if self.storage:
+                self.storage.save_project(project_model)
+                logger.info(f"Zapisano {project_model.tytul}")
+            else:
+                logger.debug(f"Pobrano detale {project_url}, ale storage_manager nie istnieje i nie ma możliwości zapisu")
             return True
         except Exception as e:
             logger.error(f"Błąd przy przetwarzaniu {project_url}: {e}")
