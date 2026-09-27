@@ -151,6 +151,7 @@ def run_project_scraper():
             }
 
             bledy = 0
+            kolejne_bledy_z_rzedu = 0
 
             #czekamy na zakończenie zadań
             for future in concurrent.futures.as_completed(future_to_url):
@@ -159,10 +160,19 @@ def run_project_scraper():
                     sukces = future.result()
                     if not sukces:
                         bledy += 1
+                        kolejne_bledy_z_rzedu += 1
                         logger.error(f"Nie udało się przetworzyć projektu {url}")
+                    else:
+                        kolejne_bledy_z_rzedu = 0
                 except Exception as e:
                     bledy += 1
+                    kolejne_bledy_z_rzedu += 1
                     logger.error(f"Nieprzewidziany wyjątek w workerze projektu {url}: {e}")
+                if kolejne_bledy_z_rzedu >= LIMIT_BLEDOW:
+                    logger.error(f"Osiągnięto limit błędów {LIMIT_BLEDOW} z rzędu, anulowanie pozostałych zadań.")
+                    for pending_future in future_to_url:
+                        pending_future.cancel()
+                    break
     logger.info(f"Łączna liczba pominiętych/błędnych projektów: {bledy}")
     
 ###########
