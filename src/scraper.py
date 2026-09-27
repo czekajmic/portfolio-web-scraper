@@ -1,12 +1,13 @@
 import logging
 from typing import Optional
 from src.storage import JsonlStorage
-from src.config import DEFAULT_HEADERS, DEFAULT_TIMEOUT_DURATION, DEFAULT_CONNECT_DURATION, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_DURATION
+from src.config import DEFAULT_HEADERS, DEFAULT_TIMEOUT_DURATION, DEFAULT_CONNECT_DURATION, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_DURATION, POLITE_BASE_DELAY, POLITE_JITTER_MAX
 import httpx
 import time
 from src.parsers import parse_project_details
 import sys
 import threading
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,10 @@ class MapadotacjiScraper:
         for attempt in range(1, DEFAULT_MAX_RETRIES + 1):
             #najpierw sprawdzamy czy nie ma cooldownu
             self._wait_if_cooldown()
+
+            jitter = random.uniform(0.0, POLITE_JITTER_MAX)
+            polite_delay = POLITE_BASE_DELAY + jitter
+            time.sleep(polite_delay)
 
             try:
                 logger.debug(f"Pobieranie {attempt}/{DEFAULT_MAX_RETRIES} dla {url}")
