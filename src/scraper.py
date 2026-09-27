@@ -89,7 +89,7 @@ class MapadotacjiScraper:
                 continue
         #jeśli tu dotarliśmy, to wyczerpaliśmy limit prób
         logger.error(f"Wyczerpano limit prób dla {url}")
-        raise RuntimeError("Nie udało się pobrać {url}")
+        raise RuntimeError(f"Nie udało się pobrać {url}")
     def __exit__(self, exc_type, exc, tb):
         self.client.close()
         logger.info("Zamknięto klienta HTTP")
