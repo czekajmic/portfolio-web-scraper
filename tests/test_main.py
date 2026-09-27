@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import patch, MagicMock, mock_open
 
 #tą funkcję testujemy
-from src.main import run_crawler
 from src.main import run_link_collector
 
 #Atrapy, zamiast Magic Mock
