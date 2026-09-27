@@ -1,5 +1,5 @@
-DEBUG_MODE = True
-DEBUG_MAX_PAGES = 10
+DEBUG_MODE = False
+DEBUG_MAX_PAGES = 3
 LIMIT_BLEDOW = 3
 LINKS_FILE = "project_links.txt"
 
@@ -19,3 +19,7 @@ DEFAULT_DELAY_DURATION = 2.0
 
 #models.py
 INVALID_PROJECT_ERROR_MESSAGE = "Odrzucono model: Wykryto brak ID oraz tytułu jednocześnie."
+
+#main.py
+POLITE_BASE_DELAY = 0.5
+POLITE_JITTER_MAX = 1.0
