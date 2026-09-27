@@ -2,16 +2,28 @@ import pytest
 from unittest.mock import patch, MagicMock, mock_open
 
 #tą funkcję testujemy
-from src.main import run_link_collector
+from src.main import run_link_collector, MAX_WORKERS
 
 #Atrapy, zamiast Magic Mock
 class FakeTracker:
     def __init__(self, file_path=""):
         self.zapisane_strony = []
     def is_search_page_visited(self, page_num):
+        if page_num > 50:
+            raise RuntimeError("Wykryto nieskończoną pętlę")
         return False #udajemy zawsze że strony jeszcze nie było
     def mark_search_page_visited(self, page_num):
         self.zapisane_strony.append(page_num)
+
+class FakeScraperPaginating:
+    def __init__(self, storage_manager=None): pass
+    def __enter__(self): return self
+    def __exit__(self, exc_type, exc, tb): pass
+
+    def fetch_html(self, url):
+        if "page_no=1" in url or "page_no=2" in url:
+            return "ZAWARTOSC_STRONY_Z_LINKAMI"
+        return "ZAWARTOSC_STRONY_PUSTA"
 
 class FakeScraperSuccess:
     #bezbłedne oddanie zawartości
@@ -37,6 +49,12 @@ def fake_extract_links_success(html_content, base_url):
 def fake_extract_links_empty(html_content, base_url):
     return set()
 
+def fake_extract_links_dynamic(html_content, base_url):
+    if html_content == "ZAWARTOSC_STRONY_Z_LINKAMI":
+        return {"https://test-link.gov.pl/projekt1", "https://test-link.gov.pl/projekt2"}
+    return set()
+
+
 #Testy oparte na atrapach
 
 #Test 1: błąd scrapera = strona nie została oznaczona w trackerze
@@ -55,16 +73,16 @@ def test_run_link_collector_does_not_save_page_on_error(MockScraper, MockTracker
 @patch("builtins.open", new_callable=mock_open)
 @patch("src.main.ProgressTracker")
 @patch("src.main.MapadotacjiScraper")
-@patch("src.main.extract_project_links", side_effect=fake_extract_links_empty)
+@patch("src.main.extract_project_links", side_effect=fake_extract_links_dynamic)
 def test_run_link_collector_handles_empty_pages_safely(MockExtract, MockScraper, MockTracker, mock_file):
     tracker_fake = FakeTracker()
     MockTracker.return_value = tracker_fake
-    MockScraper.return_value = FakeScraperSuccess()
+    MockScraper.return_value = FakeScraperPaginating()
 
     with patch("src.main.DEBUG_MODE", False):
         run_link_collector()
-    assert mock_file().write.call_count == 0
-    assert len(tracker_fake.zapisane_strony) >= 1
+    assert mock_file().write.call_count > 0
+    assert len(tracker_fake.zapisane_strony) <= MAX_WORKERS * 2 # Np. 15 workerów, to jedna lub dwie paczki to 30 pozycji w trackerze
 
 #Test 3: Standardowa udana strona
 @patch("builtins.open", new_callable=mock_open)
