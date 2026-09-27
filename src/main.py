@@ -93,7 +93,7 @@ def run_link_collector():
                             batch_bledy += 1
                         elif len(wynik_linki) == 0:
                             logger.info(f"Osiągnięto koniec danych na stronie {page_num}")
-                            #koniec_danych = True
+                            koniec_danych = True
                             if not tracker.is_search_page_visited(page_num):
                                 tracker.mark_search_page_visited(page_num)
                         else:
@@ -144,7 +144,7 @@ def run_project_scraper():
 
         #otwieramy pulę wątków dla fazy 2
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            #bieerzemy pulę linków
+            #bierzemy pulę linków
             future_to_url = {
                 executor.submit(_process_single_project, url): url
                 for url in project_urls
