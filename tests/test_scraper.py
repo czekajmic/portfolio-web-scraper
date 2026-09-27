@@ -18,3 +18,16 @@ def test_fetch_html_retries_on_request_error():
                     scraper.fetch_html("https://test.gov.pl/projekt/1")
 
         assert mock_get.call_count == DEFAULT_MAX_RETRIES
+
+#Test 2: symulacja modyfikacji struktury strony np. poprzez captcha, oczekujemy zwrócenia false ale nie crashu aplikacji
+@patch("src.scraper.parse_project_details")
+def test_process_project_handles_soft_ban_and_parsing_errors(mock_parse):
+    mock_storage = MagicMock()
+
+    with MapadotacjiScraper(storage_manager=mock_storage) as scraper:
+        with patch.object(scraper, "fetch_html", return_value="<html><body>Weryfikacja Cloudflare</body></html>"):
+            mock_parse.side_effect = ValueError("Brak wymaganych pól w HTML")
+            result = scraper.process_project("https://mapadotacji.gov.pl/projekty/fake/")
+
+            assert result is False
+            mock_storage.save_project.assert_not_called()
