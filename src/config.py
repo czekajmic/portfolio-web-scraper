@@ -2,6 +2,8 @@ DEBUG_MODE = False
 DEBUG_MAX_PAGES = 3
 LIMIT_BLEDOW = 3
 LINKS_FILE = "project_links.txt"
+OUTPUT_FILE = "data/mapadotacji_wyniki.jsonl"
+MAX_WORKERS = 12
 
 BASE_URL = "https://mapadotacji.gov.pl"
 UNKNOWN_ID_FLAG = "BRAK_ID"
