@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from src.storage import JsonlStorage
-from src.config import DEFAULT_HEADERS, DEFAULT_TIMEOUT_DURATION, DEFAULT_CONNECT_DURATION, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_DURATION, POLITE_BASE_DELAY, POLITE_JITTER_MAX
+from src.config import DEFAULT_HEADERS, DEFAULT_TIMEOUT_DURATION, DEFAULT_CONNECT_DURATION, DEFAULT_MAX_RETRIES, DEFAULT_DELAY_DURATION, POLITE_BASE_DELAY, POLITE_JITTER_MAX, MAX_WORKERS
 import httpx
 import time
 from src.parsers import parse_project_details
@@ -22,6 +22,8 @@ class MapadotacjiScraper:
 
         self._cooldown_lock = threading.Lock()
         self._cooldown_until: float = 0.0
+        self._global_errors: int = 0
+        self._consecutive_network_errors: int = 0
 
         logger.info("Zainicjalizowano MapadotacjiScraper")
 
@@ -55,15 +57,26 @@ class MapadotacjiScraper:
                 response = self.client.get(url)
                 #wyjątek jeśli zły status http
                 response.raise_for_status()
+
+                #zerowanie licznika globalnych awarii przy sukcesie
+                if self._global_errors > 0 or self._consecutive_network_errors > 0:
+                    with self._cooldown_lock:
+                        self._global_errors = 0
+                        self._consecutive_network_errors = 0
                 return response.text
-            except httpx.HTTPStatusError as e:
+            except httpx.HTTPStatusError as e: #błędy serwera
                 status = e.response.status_code
                 logger.warning(f"Błąd sieci {status} podczas pobierania nr {attempt} dla {url}: {e}")
 
+                #coś nie tak z projektami, nie włączają hibernacji i są pomijane
                 if 400 <= status < 500 and status not in (429, 403):
                     logger.error(f"Błąd klienta {status} dla {url}")
                     raise RuntimeError(f"Błąd {status} dla {url}")
 
+                if status >= 500 and status != 503:
+                    logger.error(f"Błąd serwera {status} dla {url}")
+                    self._handle_global_error(e)
+                    raise RuntimeError(f"Awaria serwera {status} dla {url}")
                 
                 if status in (429, 403, 503): #typ rate limit
                     cooldowns = {1: 60, 2: 300, 3:900}
@@ -76,16 +89,19 @@ class MapadotacjiScraper:
                         new_cooldown = now + cooldown_time
                         if new_cooldown > self._cooldown_until:
                             self._cooldown_until = new_cooldown
-            except httpx.RequestError as e:
-                cooldown_time = 15*(2 ** attempt-1)
+            except httpx.RequestError as e: #błędy lokalne
+                with self._cooldown_lock:
+                    self._consecutive_network_errors += 1
+                    current_errors = self._consecutive_network_errors
+
+                if current_errors >= max(MAX_WORKERS, 3):
+                    logger.critical(f"Wystąpiło {current_errors} błędów sieciowych z rzędu")
+
+                cooldown_time = 5 * attempt
                 logger.warning(f"Błąd sieci podczas pobierania nr {attempt} dla {url}: {e}")
 
-                with self._cooldown_lock:
-                    now = time.time()
-                    new_cooldown = now + cooldown_time
-                    if new_cooldown > self._cooldown_until:
-                        logger.warning(f"Wykryto timeout, globalne uśpienie na {cooldown_time}")
-                        self._cooldown_until = new_cooldown
+                logger.warning(f"Błąd lokalny nr {attempt} dla {url}: {e}, usypiam na {cooldown_time} s.")
+                time.sleep(cooldown_time)
                 continue
         #jeśli tu dotarliśmy, to wyczerpaliśmy limit prób
         logger.error(f"Wyczerpano limit prób dla {url}")
@@ -109,6 +125,26 @@ class MapadotacjiScraper:
         except Exception as e:
             logger.error(f"Błąd przy przetwarzaniu {project_url}: {e}")
             return False
+
+    #hibernacja dla całej puli wątków
+    def _handle_global_error(self, e: Exception):
+        with self._cooldown_lock:
+            now = time.time()
+            #sprawdzamy czy inny wątek nie ogłosił już tej samej awarii
+            if now >= self._cooldown_until:
+                self._global_errors += 1
+
+                #rosnący downtime programu
+                if self._global_errors == 1:
+                    cooldown_time = 60
+                elif self._global_errors == 2:
+                    cooldown_time = 300
+                else:
+                    cooldown_time = 900 + 60 * (self._global_errors - 2)
+
+                self._cooldown_until = now + cooldown_time
+                logger.critical(f"Globalna awaria z serii nr {self._global_errors}: {e}, hibernujemy wszystkie wątki na {cooldown_time} s. ")
+            
 
 
 #TESTOWANIE
