@@ -10,3 +10,4 @@ scripts/check_parsing_speed.py
 scripts/check_wp_api.py
 *.txt
 /tools/*
+/data/*
