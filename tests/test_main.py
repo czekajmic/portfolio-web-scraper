@@ -101,26 +101,25 @@ def test_run_link_collector_saves_page_on_success(MockExtract, MockScraper, Mock
     assert len(tracker_fake.zapisane_strony) == 2
     mock_file().write.assert_called_with("https://test-link.gov.pl\n")
 
-#Test 4: weryfikacja zapisywania url projektu jako odwiedzonego, jeżeli
+#Test 4: weryfikacja że skrypt przetwarza wszystkie linki mimo błędów
 @patch("src.main.MapadotacjiScraper")
 @patch("src.main.JsonlStorage")
 @patch("src.main.ProgressTracker")
 @patch("builtins.open", new_callable=mock_open, read_data="http://url1\nhttp://url2\nhttp://url3\nhttp://url4\nhttp://url5\n")
-def test_run_project_scraper_circuit_breaker(mock_file, MockTracker, MockStorage, MockScraper):
-    #udajemy że żadnego linku jeszcze nie ma
+def test_run_project_scraper_never_cancels(mock_file, MockTracker, MockStorage, MockScraper):
     tracker_instance = MockTracker.return_value
     tracker_instance.is_visited.return_value = False
 
-    #udajemy bana - wszystkie próby to porażka
     scraper_instance = MockScraper.return_value.__enter__.return_value
-    scraper_instance.process_project.return_value = False
 
     def slow_failing_worker(*args, **kwargs):
-        time.sleep(0.05)
+        import time
+        time.sleep(0.01)
         return False
+
     scraper_instance.process_project.side_effect = slow_failing_worker
 
-    with patch("src.main.LIMIT_BLEDOW", 3), patch("src.main.MAX_WORKERS", 1):
+    with patch("src.main.MAX_WORKERS", 2):
         run_project_scraper()
 
-    assert scraper_instance.process_project.call_count < 5, "Skrypt zignorował LIMIT_BLEDOW"
+    assert scraper_instance.process_project.call_count == 5, "Skrypt przedwcześnie anulował zadania"
