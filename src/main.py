@@ -3,12 +3,10 @@ import sys
 from src.storage import JsonlStorage, ProgressTracker
 from src.scraper import MapadotacjiScraper
 from src.parsers import extract_project_links
-from src.config import DEBUG_MODE, DEBUG_MAX_PAGES, BASE_URL, LIMIT_BLEDOW, LINKS_FILE
+from src.config import DEBUG_MODE, DEBUG_MAX_PAGES, BASE_URL, LIMIT_BLEDOW, LINKS_FILE, MAX_WORKERS, OUTPUT_FILE
 import time
 import concurrent.futures
 import itertools
-
-MAX_WORKERS = 15
 
 def run_link_collector():
     logger = logging.getLogger(__name__)
@@ -121,7 +119,7 @@ def run_project_scraper():
     #ten tracker pilnuje konkretnych linków do projektów
     tracker = ProgressTracker(file_path="visited_urls.txt")
 
-    with JsonlStorage("mapadotacji_wyniki.jsonl") as storage, MapadotacjiScraper(storage_manager=storage) as scraper:
+    with JsonlStorage(OUTPUT_FILE) as storage, MapadotacjiScraper(storage_manager=storage) as scraper:
         #definiujemy pojedynczego workera
         def _process_single_project(project_url: str) -> bool:
             if tracker.is_visited(project_url):
@@ -151,7 +149,6 @@ def run_project_scraper():
             }
 
             bledy = 0
-            kolejne_bledy_z_rzedu = 0
 
             #czekamy na zakończenie zadań
             for future in concurrent.futures.as_completed(future_to_url):
@@ -160,19 +157,10 @@ def run_project_scraper():
                     sukces = future.result()
                     if not sukces:
                         bledy += 1
-                        kolejne_bledy_z_rzedu += 1
                         logger.error(f"Nie udało się przetworzyć projektu {url}")
-                    else:
-                        kolejne_bledy_z_rzedu = 0
                 except Exception as e:
                     bledy += 1
-                    kolejne_bledy_z_rzedu += 1
                     logger.error(f"Nieprzewidziany wyjątek w workerze projektu {url}: {e}")
-                if kolejne_bledy_z_rzedu >= LIMIT_BLEDOW:
-                    logger.error(f"Osiągnięto limit błędów {LIMIT_BLEDOW} z rzędu, anulowanie pozostałych zadań.")
-                    for pending_future in future_to_url:
-                        pending_future.cancel()
-                    break
     logger.info(f"Łączna liczba pominiętych/błędnych projektów: {bledy}")
     
 ###########
