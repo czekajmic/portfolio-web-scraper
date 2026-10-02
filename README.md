@@ -9,6 +9,7 @@ This project is engineered with a strong focus on resilience, network stability 
 - [Technologies Used](#technologies-used)
 - [Features](#features)
 - [Setup](#setup)
+- [Running the Scraper](#running-the-scraper)
 
 ## General Information
 Extracting large datasets from public infrastructure can lead to bottlenecks, IP bans and unpredictable server downtimes. This project is a robust ETL (Extracl, Transform, Load) pipeline designed to survive network chaos.
@@ -29,9 +30,31 @@ Extracting large datasets from public infrastructure can lead to bottlenecks, IP
 * Utilizing Pydantic models to guarantee data structure consistency before committing record to storage.
 
 ## Setup
-Clone the repository and install the required dependencies:
+Clone the repository and prepare the virtual environment:
 ```
 git clone https://github.com/czekajmic/portfolio-web-scraper/
 cd portfolio-web-scraper
+python3 -m venv venv
+```
+Activate the virtual environment:
+
+On Linux/macOS:
+```
+source venv/bin/activate
+```
+On Windows:
+```
+venv/Scripts/activate
+```
+
+Upgrade pip and install dependencies:
+```
+pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+## Running the Scraper
+To run the pipeline and begin extraction, ensure your virtual environment is active, then run the main module from the root directory:
+```
+python3 -m src.main
 ```
